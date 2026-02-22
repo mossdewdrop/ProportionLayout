@@ -3,9 +3,9 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 
 /// <summary>
-/// 比例布局控制组件。
-/// 根据子对象上唯一的proportion值和自身的布局方向来动态调整其尺寸。
-/// 支持反转布局顺序和设置元素间距。
+/// Proportion layout controller component.
+/// Dynamically sizes children based on their proportion values and layout direction.
+/// Supports reversing order and spacing between elements.
 /// </summary>
 [ExecuteInEditMode]
 [RequireComponent(typeof(RectTransform))]
@@ -17,7 +17,7 @@ public class ProportionLayoutGroup : LayoutGroup
         Vertical
     }
 
-    [Tooltip("布局方向：\nHorizontal - 根据proportion设置宽度，高度填满容器。\nVertical - 根据proportion设置高度，宽度填满容器。")]
+    [Tooltip("Layout direction:\nHorizontal - width by proportion, height fills the container.\nVertical - height by proportion, width fills the container.")]
     [SerializeField]
     private LayoutDirection m_Direction = LayoutDirection.Horizontal;
     public LayoutDirection Direction
@@ -26,7 +26,7 @@ public class ProportionLayoutGroup : LayoutGroup
         set { SetProperty(ref m_Direction, value); }
     }
 
-    [Tooltip("子元素在布局方向上的间距（像素值）。")]
+    [Tooltip("Pixel spacing between children on the primary axis.")]
     [SerializeField]
     private float m_Spacing = 0;
     public float Spacing
@@ -35,7 +35,7 @@ public class ProportionLayoutGroup : LayoutGroup
         set { SetProperty(ref m_Spacing, value); }
     }
 
-    [Tooltip("勾选后，子元素的布局顺序将与它们在层级面板中的顺序相反。")]
+    [Tooltip("When enabled, child layout order is reversed relative to hierarchy order.")]
     [SerializeField]
     private bool m_ReverseOrder = false;
     public bool ReverseOrder
@@ -44,7 +44,7 @@ public class ProportionLayoutGroup : LayoutGroup
         set { SetProperty(ref m_ReverseOrder, value); }
     }
 
-    // 缓存带有ProportionLayoutElement的子对象列表
+    // Cached list of children that have ProportionLayoutElement
     private readonly List<RectTransform> m_ValidChildren = new List<RectTransform>();
 
     public override void CalculateLayoutInputHorizontal()
@@ -57,12 +57,12 @@ public class ProportionLayoutGroup : LayoutGroup
 
     public override void SetLayoutHorizontal()
     {
-        SetLayout(0); // 0代表水平轴 (X)
+        SetLayout(0); // 0 represents the horizontal axis (X)
     }
 
     public override void SetLayoutVertical()
     {
-        SetLayout(1); // 1代表垂直轴 (Y)
+        SetLayout(1); // 1 represents the vertical axis (Y)
     }
 
     private void UpdateValidChildren()
@@ -101,7 +101,6 @@ public class ProportionLayoutGroup : LayoutGroup
 
     private void LayoutPrimaryAxis(int axis)
     {
-        // 1. 计算总权重
         float totalProportion = 0;
         foreach (var child in m_ValidChildren)
         {
@@ -111,27 +110,61 @@ public class ProportionLayoutGroup : LayoutGroup
 
         if (totalProportion <= 0) return;
 
-        // --- 新增逻辑：计算总间距 ---
-        // 如果有N个元素，则有N-1个间距
         float totalSpacing = Mathf.Max(0, m_ValidChildren.Count - 1) * m_Spacing;
 
-        // 2. 计算可用空间，需要减去内边距和总间距
         float availableSize = (axis == 0) ? rectTransform.rect.width - padding.horizontal : rectTransform.rect.height - padding.vertical;
-        availableSize = Mathf.Max(0, availableSize - totalSpacing); // 确保可用空间不为负
+        availableSize = Mathf.Max(0, availableSize - totalSpacing);
 
         float startPos = (axis == 0) ? padding.left : padding.top;
 
-        // 3. 遍历并设置每个子对象的尺寸和位置
-        float currentPos = startPos;
-        foreach (var child in m_ValidChildren)
+        int childCount = m_ValidChildren.Count;
+        float[] childSizes = new float[childCount];
+        float[] unconstrainedProportions = new float[childCount];
+
+        float constrainedSizeSum = 0;
+        float unconstrainedTotalProportion = 0;
+
+        for (int i = 0; i < childCount; i++)
         {
+            var child = m_ValidChildren[i];
             var element = child.GetComponent<ProportionLayoutElement>();
             float proportion = Mathf.Max(0, element.proportion);
+            float initialSize = (proportion / totalProportion) * availableSize;
 
-            float childSize = (proportion / totalProportion) * availableSize;
+            if (element.enablePixelLimit)
+            {
+                float minPixels = Mathf.Max(0, element.minPixels);
+                float maxPixels = Mathf.Max(minPixels, element.maxPixels);
+                float clampedSize = Mathf.Clamp(initialSize, minPixels, maxPixels);
+                childSizes[i] = clampedSize;
+                constrainedSizeSum += clampedSize;
+            }
+            else
+            {
+                unconstrainedProportions[i] = proportion;
+                unconstrainedTotalProportion += proportion;
+            }
+        }
+
+        float remainingSize = Mathf.Max(0, availableSize - constrainedSizeSum);
+
+        if (unconstrainedTotalProportion > 0)
+        {
+            for (int i = 0; i < childCount; i++)
+            {
+                if (unconstrainedProportions[i] > 0)
+                {
+                    childSizes[i] = (unconstrainedProportions[i] / unconstrainedTotalProportion) * remainingSize;
+                }
+            }
+        }
+
+        float currentPos = startPos;
+        for (int i = 0; i < childCount; i++)
+        {
+            var child = m_ValidChildren[i];
+            float childSize = childSizes[i];
             SetChildAlongAxis(child, axis, currentPos, childSize);
-
-            // --- 修改点：更新当前位置时，加上元素尺寸和间距 ---
             currentPos += childSize + m_Spacing;
         }
     }

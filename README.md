@@ -9,6 +9,7 @@ A lightweight Unity UI layout plugin that sizes child elements by proportion. It
 - Per-element weight via a simple component
 - Optional spacing between elements
 - Optional reverse order
+- Optional per-element pixel size limits
 
 ## Installation
 
@@ -38,6 +39,11 @@ Only children with `ProportionLayoutElement` and active in hierarchy are include
 **ProportionLayoutElement**
 
 - Proportion: non-negative weight on the primary axis
+- Enable Pixel Limit: toggles pixel range limits on the primary axis
+- Min Pixels: minimum allowed pixels on the primary axis
+- Max Pixels: maximum allowed pixels on the primary axis
+
+![Enable Pixel Limit](DocAssets/PixelLimit.png)
 
 ## Example
 
@@ -46,3 +52,5 @@ Three children with proportions 1, 2, and 3 in Horizontal mode:
 - Total proportion = 1 + 2 + 3 = 6
 - Child sizes = 1/6, 2/6, 3/6 of the available width
 - Height of each child fills the parent height (minus padding)
+
+![Example](DocAssets/Example.png)
